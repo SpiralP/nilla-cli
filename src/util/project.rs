@@ -1,20 +1,20 @@
-use anyhow::{anyhow, bail};
-use log::{debug, info, trace, warn};
-use serde::Serialize;
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
     str::FromStr,
 };
+
+use anyhow::{anyhow, bail};
+use log::{debug, info, trace, warn};
+use serde::Serialize;
 use url::Url;
 
+use super::nix::FixedOutputStoreEntry;
 use crate::util::{
     git,
     nix::{self, EvalResult},
     search::{search_up_for_dir, search_up_for_file},
 };
-
-use super::nix::FixedOutputStoreEntry;
 
 #[derive(Debug, Clone)]
 pub enum Source {
