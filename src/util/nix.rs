@@ -269,7 +269,7 @@ pub async fn build<P>(file: P, name: &str, opts: BuildOpts<'_>) -> Result<Vec<St
 where
     P: AsRef<Path>,
 {
-    let mut args = vec!["build"];
+    let mut args = vec!["build", "--print-build-logs"];
     if !opts.link {
         args.push("--no-link");
     }
