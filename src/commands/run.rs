@@ -1,15 +1,19 @@
 use std::path::PathBuf;
 
-use log::{debug, error, info, trace};
+use anyhow::bail;
+use log::{debug, info, trace};
 
 use crate::util::nix;
 
-pub async fn run_cmd(cli: &nilla_cli_def::Cli, args: &nilla_cli_def::commands::run::RunArgs) {
+pub async fn run_cmd(
+    cli: &nilla_cli_def::Cli,
+    args: &nilla_cli_def::commands::run::RunArgs,
+) -> anyhow::Result<()> {
     debug!("Resolving project {}", cli.project);
     let rs = crate::util::project::resolve(&cli.project).await;
 
     let Ok(project) = rs else {
-        return error!("{:?}", rs.unwrap_err());
+        bail!("{:?}", rs.unwrap_err());
     };
 
     let entry = project.clone().get_entry();
@@ -22,7 +26,7 @@ pub async fn run_cmd(cli: &nilla_cli_def::Cli, args: &nilla_cli_def::commands::r
     subpath.push("nilla.nix");
 
     match path.try_exists() {
-        Ok(false) | Err(_) => return error!("File not found"),
+        Ok(false) | Err(_) => bail!("File not found"),
         _ => {}
     }
 
@@ -30,7 +34,7 @@ pub async fn run_cmd(cli: &nilla_cli_def::Cli, args: &nilla_cli_def::commands::r
         Some(s) => s,
         _ => &match nix::get_system().await {
             Ok(s) => s,
-            Err(e) => return error!("{e:?}"),
+            Err(e) => bail!("{e:?}"),
         },
     };
 
@@ -52,46 +56,46 @@ pub async fn run_cmd(cli: &nilla_cli_def::Cli, args: &nilla_cli_def::commands::r
     match nix::exists_in_project(
         subpath.to_str().unwrap_or("nilla.nix"),
         entry.clone(),
-        &attribute,
+        attribute,
     )
     .await
     {
         Ok(false) => {
-            return error!("Attribute {attribute} does not exist in project {path:?}");
+            bail!("Attribute {attribute} does not exist in project {path:?}");
         }
-        Err(e) => return error!("{e:?}"),
+        Err(e) => bail!("{e:?}"),
         _ => {}
     }
     info!("Building package {name}");
     let out = nix::build(
         &path,
-        &attribute,
+        attribute,
         nix::BuildOpts {
             link: false,
             report: true,
-            system: &system,
+            system,
         },
     )
     .await;
 
     let Ok(value) = out else {
-        return error!("{:?}", out.unwrap_err());
+        bail!("{:?}", out.unwrap_err());
     };
 
-    if value.len() == 0 {
-        return error!("Package has no outputs");
+    if value.is_empty() {
+        bail!("Package has no outputs");
     }
 
     let main_prog = nix::get_main_program(
-        path.iter().last().take().unwrap().to_str().unwrap(),
+        path.iter().next_back().unwrap().to_str().unwrap(),
         entry.clone(),
-        &name,
-        nix::GetMainProgramOpts { system: &system },
+        name,
+        nix::GetMainProgramOpts { system },
     )
     .await;
 
     let Ok(main) = main_prog else {
-        return error!("{:?}", main_prog.err());
+        bail!("{:?}", main_prog.err());
     };
 
     let mut binary_path = PathBuf::from(value[0].clone());
@@ -106,5 +110,6 @@ pub async fn run_cmd(cli: &nilla_cli_def::Cli, args: &nilla_cli_def::commands::r
         .args(command_args)
         .exec_replace()
         .unwrap();
-    std::process::exit(0);
+
+    Ok(())
 }
