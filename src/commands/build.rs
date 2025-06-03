@@ -24,13 +24,10 @@ async fn determine_build_type(
 	  project.{attribute}.name
 	");
 
-    let real_name_value = nix::evaluate(
-        &code,
-        nix::EvalOpts {
-            json: true,
-            impure: false,
-        },
-    )
+    let real_name_value = nix::evaluate(&code, nix::EvalOpts {
+        json: true,
+        impure: false,
+    })
     .await
     .unwrap();
 
@@ -108,20 +105,16 @@ pub async fn build_cmd(
 
     let build_type = determine_build_type(
         attribute,
-        path.iter().next_back().unwrap().to_str().unwrap(),
+        subpath.to_str().unwrap_or("nilla.nix"),
         entry.clone(),
     )
     .await;
     info!("Building {} {}", build_type.0, build_type.1);
-    nix::build(
-        &path,
-        attribute,
-        nix::BuildOpts {
-            link: !args.no_link,
-            report: true,
-            system,
-        },
-    )
+    nix::build(&path, attribute, nix::BuildOpts {
+        link: !args.no_link,
+        report: true,
+        system,
+    })
     .await?;
 
     Ok(())
